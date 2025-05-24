@@ -9,12 +9,10 @@ description = ""
 
 Every once in a while a client comes in asking "What else can we do to make our
 codebase more secure?". Depending on the types of bugs that we have found during
-the code review one of the things you might want to say are: 
-- "Well, you should re-write this project from scrach" (you probably shouldn't
-  say it this way)
-- "Well, your codebase was solid, you can implement some runtime monitoring
-  solutions that would react to security incidents automatically"
-- "Well, you could improve your test suite..."
+the code review the answer will vary. A good starting point most of the time is
+evaluating how good your test suite is at catching basic bugs. If you think
+of your tests as a specification of your business logic, then the test suite
+should catch any changes to the code since business logic changed.
 
 <!--more-->
 
@@ -23,9 +21,20 @@ you currently are. How do you do this?
 
 ### How do you test the test suite?
 
+One approach would be to manually go through the test files and see what is
+being tested. This process is time consuming and depending on where you are in
+the process (project design phase, before audit / after audit etc.), the
+efficient approach will be different. A helpful way to design test cases in a
+structured format would be something like the [Branching Tree Technique](https://youtu.be/0-EmbNVgFA4?si=Z5BNbfXAKLvu3Y2k).
+
+Another approach which is the topic of this article is to introduce small
+modification to the codebase and see how the test suite reacts to them. Ideally
+if you change something, the test suite should react accordingly and fail to
+indicate that the business logic does not match the specification anymore.
+
 ### What is mutation testing?
 
-Mutation is a technique that allows you to evaluate the tests. Since the tests
+Mutation analysis is a technique that allows you to evaluate the tests. Since the tests
 evaluate if the application conforms to the specification, the question arises
 how do you evaluate the tests themselves? How do we now that the specification
 is robust and covers the buisness logic of the application? Mutation testing is
@@ -36,9 +45,14 @@ code no longer reflects the business logic of your application.
 ### How to perform mutation testing?
 
 Mutation analysis consists of two stages:
-1. Generating the modified versions of your code.
+1. Generating the modified versions of your code refferred to as mutants. Each
+   mutated version contains a single change as compared to the original code.
 2. Running the test suite over the modified version to see if the tests will
-   catch the change.
+   catch the change. This step has to be repeated for every mutant one by one.
+
+You can probably guess that the second step is time consuming and doing this by
+hand would be tedious. Subsequent section of this article easy ways to automate
+the whole process so that you can sit back and wait for the results.
 
 ### How to generate the mutants?
 
