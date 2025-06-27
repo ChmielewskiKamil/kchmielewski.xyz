@@ -90,8 +90,22 @@ Neovim is issuing requests to that webserver and receiving responses.
 
 I still don't fully get this how Neovim is able to determine which transport
 method to choose solely based on the `cmd` that you provide it. For example you
-could connect to the LSP in this way `cmd = vim.lsp.rpc.connect('127.0.0.1',
+could [connect to the LSP via RPC](https://neovim.io/doc/user/lsp.html#lsp-rpc) `cmd = vim.lsp.rpc.connect('127.0.0.1',
 4000)` and it would work the same.
+
+One of the very first things that you will read in the spec is that each request
+is divided into two parts. This includes our initialization request that we try
+to implement. [There is the header part and content part](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#baseProtocol). They are separated with
+the `\r\n` separator.
+
+```txt
+header part
+\r\n
+content part
+```
+
+[Commit hash reference for this version of the code on
+GitHub](https://github.com/ChmielewskiKamil/solbot-lsp/blob/696dac9d308109c3e65b867ecda5cc241a0e246a/main.c).
 
 ```C
 #include <stdbool.h>
