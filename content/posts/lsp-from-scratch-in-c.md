@@ -80,6 +80,10 @@ program. To visualize what the client (code editor) is sending to the language
 server we can create an extremely simple program that is reading the Standard
 Input (`stdin`).
 
+The client is sednign messages to the server using `stdin`. The server is
+sending responses to the client through `stdout`. Any errors should go to
+`stderr`.
+
 The point that I personally was really confused about is the fact that the
 Language Server Protocol is just specification and you can handle the
 communication however you like. The client code editors are smart enough to be
@@ -104,42 +108,76 @@ header part
 content part
 ```
 
-[Commit hash reference for this version of the code on
-GitHub](https://github.com/ChmielewskiKamil/solbot-lsp/blob/696dac9d308109c3e65b867ecda5cc241a0e246a/main.c).
+TODO: Explain that the header itself consists of parts that are separated with
+the same separator `\r\n`.
+
+Lets write a simple C program that will read something from the `stdin` to see
+what the code editor is sending to us in the header part. The simplest idea how you might want to
+implement would follow this approach:
+
+1. Read a single line from `stdin`.
+2. Print it for debugging.
+3. See if the line contains exactly `\r\n` and nothing else. If that's the case
+   we could stop the program since that's the end of the header part.
+
+You can try giving it a go. Depending on how you implement debug printing
+mechanism, your attempt might result in an immediate and silent failure with no
+clue on what went wrong. Have a look at this program that is doing exactly that
+and uses `printf(...)` for debugging.
 
 ```C
-#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 
-void log_message(const char *message) {
-  FILE *log_file = fopen("/tmp/solbot-lsp.log", "a"); // append mode
-  if (log_file != NULL) {
-    fputs(message, log_file);
-    fputc('\n', log_file);
-    fclose(log_file);
-  }
-}
-
 int main() {
-  fclose(fopen("/tmp/solbot-lsp.log", "w")); // clear the content each time
-  log_message("--- LSP Server Started ---");
+  // For now we don't know how much to read. Provide an arbitrary number.
+  // We will read what we can and ignore the rest of the content.
+  char line_buffer[1024];
+  char *separator = "\r\n";
 
+  // The Language Server operates in an infinite loop where it reads messages
+  // one by one. In our case we just want to read the header of the first
+  // 'initialize' message.
   while (1) {
-    char line_buffer[1024];
-    bool readHeader = true;
-    char *separator = "\r\n";
-    while (readHeader) {
-      fgets(line_buffer, sizeof(line_buffer), stdin);
-      log_message(line_buffer);
-      if (strcmp(line_buffer, separator) == 0) {
-          log_message("Found the end of header section");
-          readHeader = false;
-      }
+    // Read a single line from 'stdin'. If its EOF or an ERROR, just exit.
+    if (fgets(line_buffer, sizeof(line_buffer), stdin) == NULL) {
+      break;
     }
-    return 0;
+
+    // Debug print to 'stdout' the message that the Code Editor sent us.
+    printf("Line buffer: %s", line_buffer);
+
+    // We want to stop reading when we hit the separator between the header
+    // and content part '\r\n'.
+    if (strcmp(line_buffer, separator) == 0) {
+      printf("Found the end of header section\n");
+      break;
+    }
   }
 
   return 0;
 }
 ```
+
+Calling `fgets(...)` is like telling the server "Hey, please go check the `stdin` and
+see if something is there!". The server will grab a complete line (ending with
+`\n`) from the `stdin`. If nothing is there it will just wait. It means that the
+main server loop just stops and waits for the client to send the request. At
+this point we will not be utilizing resources from the machine by looping
+infinitely.
+
+A special case that must be handled is the situation where the client exits. If
+you close the code editor, the LSP should close as well. This will be denoted by
+`NULL` being returned by `fgets(...)` function.
+
+If you were to open your code editor using the code above for your LSP, you
+would see... exactly nothing. For Neovim you can inspect the LSP logs (primarily errors) at `~/.local/state/nvim/lsp.log`.
+Nothing shows up there. So what's going on?
+
+Do you remember when I told you that the client is using `stdin` to communicate
+with the server and the server is using `stdout` to send responses to the
+client? The `printf(...)` function used in this initial implementation is
+sending some stuff to the `stdout`. The code editor expects the responses to be
+in a very specific format outlined by the LSP specification. If the format is
+not followed, the code editor closes the connection and assumes that the server
+is broken.
