@@ -181,3 +181,75 @@ sending some stuff to the `stdout`. The code editor expects the responses to be
 in a very specific format outlined by the LSP specification. If the format is
 not followed, the code editor closes the connection and assumes that the server
 is broken.
+
+So how to fix this problem? We just have to use some other mechanism for
+printing debug messages and leave the `stdio` for client-server communication. A
+simple function that logs to a temporary log file will do the trick. On Unix
+systems we can use the `tmp/` directory to store the log file. It will get
+cleared on system reboot to not pollute your user space.
+
+The `log_message(...)` function does exactly that. It opens up a file (creates
+it when it does not exist) in an append mode. The message is added to the file
+along the newline to make it readable. After that the file is closed.
+
+```C
+#include <stdio.h> // remember about including 'stdio.h'
+
+void log_message(const char *message) {
+  FILE *log_file = fopen("/tmp/solbot-lsp.log", "a"); // 'a' - append mode
+  if (log_file != NULL) {
+    fputs(message, log_file);
+    fputc('\n', log_file);
+    fclose(log_file);
+  }
+}
+```
+
+The updated `main(...)` function looks like the following (commit hash: [b2c33b4](https://github.com/ChmielewskiKamil/solbot-lsp/blob/b2c33b4245f1e41924b0cf06bd5906e34abda386/main.c)). Calls to
+`printf(...)` has been replaced with `log_message(...)`. There is one extra line
+at the beginning of the function to clear the log file whenever the Language
+Server is launched.
+
+```C
+#include <stdio.h>
+#include <string.h>
+
+// ...
+
+int main() {
+  // 'fopen' with write mode "w" clears the file; 'fclose' immediately
+  // closes it. The end result is an empty solbot-lsp.log file on each launch.
+  fclose(fopen("/tmp/solbot-lsp.log", "w")); 
+  log_message("--- Solbot LSP Started ---");
+
+  char line_buffer[1024];
+  char *separator = "\r\n";
+
+  while (1) {
+    if (fgets(line_buffer, sizeof(line_buffer), stdin) == NULL) {
+      break;
+    }
+
+    log_message(line_buffer);
+
+    if (strcmp(line_buffer, separator) == 0) {
+      log_message("Found the end of header section");
+      break;
+    }
+  }
+
+  return 0;
+}
+```
+
+If we run the code editor this time and inspect the newly created log file we
+will be greated with the message header. Nice.
+
+```txt
+--- Solbot LSP Started ---
+Content-Length: 4272^M
+
+^M
+
+Found the end of header section
+```
