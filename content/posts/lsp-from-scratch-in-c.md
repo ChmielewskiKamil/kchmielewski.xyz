@@ -80,7 +80,7 @@ program. To visualize what the client (code editor) is sending to the language
 server we can create an extremely simple program that is reading the Standard
 Input (`stdin`).
 
-The client is sednign messages to the server using `stdin`. The server is
+The client is sending messages to the server using `stdin`. The server is
 sending responses to the client through `stdout`. Any errors should go to
 `stderr`.
 
@@ -108,8 +108,29 @@ header part
 content part
 ```
 
-TODO: Explain that the header itself consists of parts that are separated with
-the same separator `\r\n`.
+The header part itself consists of header elements. These are in the format
+`name:value\r\n`. Expanding on our example, the header file can look like this
+with two header elements.
+
+```txt
+name:value\r\n
+name:value\r\n
+\r\n
+content part
+```
+
+According to the current version of the specification ([`3.17`](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#headerPart)),
+there are currently only two possible header fields: `Content-Length` and
+`Content-Type`. Please note that it is not mandatory for both of them to be
+present. As you will see in a moment we will be mostly dealing with the
+`Content-Length` header element only.
+
+```txt
+Content-Length:value\r\n
+Content-Type:value\r\n
+\r\n
+content part
+```
 
 Lets write a simple C program that will read something from the `stdin` to see
 what the code editor is sending to us in the header part. The simplest idea how you might want to
@@ -243,7 +264,7 @@ int main() {
 ```
 
 If we run the code editor this time and inspect the newly created log file we
-will be greated with the message header. Nice.
+will be greeted with the message header. Nice.
 
 ```txt
 --- Solbot LSP Started ---
@@ -253,3 +274,43 @@ Content-Length: 4272^M
 
 Found the end of header section
 ```
+
+Depending on the operatins system that you are on, the resulting output might
+display differently in your code editor. You can read more about [the history of
+the newline control character on various operating systems on
+Wikipedia](https://en.wikipedia.org/wiki/Newline#:~:text=Software%20applications%20and%20operating%20system%20representation%20of%20a%20newline%20with%20one%20or%20two%20control), 
+but the takeway is that on Unix, newline is represented as `\n` and on Windows, network protocols, and our LSP it is `\r\n`. 
+Since I'm on NixOS, for me the carriage return `\r` is displayed as `^M`.
+It is treated as a non-printable control character. Since on Unix its not
+executed (it does not bring the cursor to the beginning of the line in that
+case), but it is there so it can't be ignored, it's ASCII character code is
+printed: `^M`.
+
+Why are there so many newlines, though? It's due to the fact that our
+`log_message(...)` function inserts additional newline on its own. If for a
+moment we remove it, the message received from the client will be easier
+to interpret. Comment out the `fputc('\n', log_file);` line.
+
+Upon opening a Solidity file in Neovim again, the log file gets populated like this:
+
+```txt
+--- Solbot LSP Started ---Content-Length: 4272
+
+Found the end of header section
+```
+
+If for a moment we ignore the `Solbot LSP Started` part, we are left with the
+message from the client. 
+
+```txt
+Content-Length: 4272'\r\n'      <-- 1st '\r\n' is encountered here
+'\r\n'                          <-- 2nd '\r\n' is encountered here
+Found the end of header section <-- This is our debug print. Content starts here
+```
+
+As you can see, we received a single header element: `Content-Length`. The end
+of this element is denoted by the separator `\r\n` which creates the first
+newline. The whole header part ends with the `\r\n` separator as well. It makes
+the cursor go to the newline again, where our debug message "Found the end of
+header section" is printed. From this you can see that the content section will
+start after two consecutive `\r\n` separators. Great! What's next?
