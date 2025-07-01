@@ -11,6 +11,20 @@ Intro here.
 
 <!--more-->
 
+## Prerequisites
+
+I am doing this as a way to learn more about C. Since you've landed at this
+pretty niche article I think you are more than competent person to implement the
+Language Server yourself.
+
+## What this article is and is not?
+
+The following article describes every single step that I took to implement an
+extremely simple implementation of the Language Server Protocol that has a
+single feature.
+
+## Intro
+
 Lately I've been dissatisfied with the current state of the art Language Server
 for Solidity programming language. I am reviewing lots of code every day and the
 fact that the Language Server is not able to provide the semantic token
@@ -131,6 +145,8 @@ Content-Type:value\r\n
 \r\n
 content part
 ```
+
+## Header Part
 
 Lets write a simple C program that will read something from the `stdin` to see
 what the code editor is sending to us in the header part. The simplest idea how you might want to
@@ -313,4 +329,204 @@ of this element is denoted by the separator `\r\n` which creates the first
 newline. The whole header part ends with the `\r\n` separator as well. It makes
 the cursor go to the newline again, where our debug message "Found the end of
 header section" is printed. From this you can see that the content section will
-start after two consecutive `\r\n` separators. Great! What's next?
+start after two consecutive `\r\n` separators. Great! What's next? The content
+part of the message.
+
+Now that the header part is handled, let's finally have a look at the content
+part. Before we are able to read the content, we need to parse the content
+length that was provided in the header. This way we will know exactly how many
+bytes to read. In our example, the client promises that the JSON message body
+that comes right after the header part is exactly `4272` bytes in size.
+
+In C the approach might look like the following:
+1. Read the line and see if it contains the following `16` bytes: `Content-Length: `. Mind the whitespace at the end before the actual length value.
+2. If it is a match, start reading from the `17th` byte and parse it as an
+   unsigned integer.
+
+An example implementation might look like this:
+
+```C
+#include <inttypes.h> // Used for printing uint64_t.
+// ...
+
+int main() {
+  // ...
+  char line_buffer[1024];
+  while (1) {
+    uint32_t content_length = 0; // >4 billion bytes -> >4 GB Payload should suffice
+    // ...
+    // After 'line_buffer' is populated with 'fgets(...)' we can check the 
+    // content length.
+    if (strncmp(line_buffer, "Content-Length: ", 16) == 0) {
+      // Conversion specifiers from `inttypes.h` can be used to print the
+      // exact-width integer types.
+      sscanf(line_buffer + 16, "%" PRIu32, &content_length);
+    }
+    // ...
+  }
+  // ...
+}
+```
+
+A thing that I found a bit confusing about C is what types to use and whether
+builtin types are OK or not. I found this [amazing explanation of the conversion
+specifiers such as PRIu32 and exact-width types](https://stackoverflow.com/a/79635738), which you might
+find interesting as well.
+
+
+Coming back to the task at hand. Our current version of the `main(...)` function will exit the main infinite loop
+as soon as it finds the standalone `\r\n` separator. This is not ideal. for
+learning purposes and looking at a single initialize message it was fine, but
+ideally we want to process all the header fields, parse the content and then
+repeat for the next message. Let's adjust the `main(...)` function to do that.
+
+We can add an inner loop that will process all the header fields and when it
+encounters the `Content-Length` header, it will extract the value it holds. Once
+we know how many bytes to read for the content section, we can read the content
+and print it. The updated `main(...)` is presented below. It has been stripped
+out of unnecessary debug message logs to occupy less space in the article. [You
+can refer to the full code at this point in the
+repo](https://github.com/ChmielewskiKamil/solbot-lsp/blob/a904490637683459db27a62602ad0dd7fb8fee4f/main.c).
+
+```C
+int main() {
+  // ...
+  // The outer loop processes complete messages (header + content).
+  while (1) {
+    uint32_t content_length = 0; // reset for each message
+    // New inner loop processes message headers.
+    while (fgets(line_buffer, sizeof(line_buffer), stdin) != NULL) {
+      if (strncmp(line_buffer, "Content-Length: ", 16) == 0) {
+        sscanf(line_buffer + 16, "%" PRIu32, &content_length);
+      }
+
+      if (strcmp(line_buffer, separator) == 0) {
+        break;
+      }
+    }
+
+    if (content_length == 0) {
+      return 1;
+    }
+
+    char *content_buffer = malloc(content_length + 1); // +1 for null terminator
+    if (content_buffer == NULL) {
+      return 1;
+    }
+
+    size_t bytes_read =
+        fread(content_buffer, sizeof(char), content_length, stdin);
+
+    if (bytes_read != content_length) {
+      free(content_buffer);
+      return 1;
+    }
+
+    content_buffer[content_length] = '\0'; // 'fread' does not null-terminate
+    log_message(content_buffer);
+
+    free(content_buffer);
+  }
+  return 0;
+}
+```
+
+Awesome. If I build the program, open the text editor, close it and inspect
+the log at `/tmp/solbot-lsp.log`, I will see the content of the initialize
+message that Neovim sent to my language server. Here is the pretty printed JSON
+payload that was in the log file. I replaced unrelevant parts with `// ...`. It
+is quite lengthy but presents the general structure that we will work with. The
+client sends its capablilities. In particular the `semanticTokens` support, 
+`hover` and `diagnostic` capablilities caught my attention. Except for that at
+the very end of the payload there is a method that was sent: `"initialize"`. It
+will be useful to pattern match the client's request with the response that the
+server should send. 
+
+```json
+{
+  "params": {
+    "trace": "off",
+    "processId": 52845,
+    "clientInfo": {
+      "name": "Neovim",
+      "version": "0.11.2"
+    },
+    "rootPath": "/home/user/projects/redacted",
+    "rootUri": "file:///home/user/projects/redacted",
+    // ... 
+    "capabilities": {
+      "textDocument": {
+        // ...
+        "semanticTokens": {
+          // ...
+          "tokenTypes": [
+            "namespace",
+            "type",
+            "class",
+            "enum",
+            "interface",
+            "struct",
+            "typeParameter",
+            "parameter",
+            "variable",
+            "property",
+            "enumMember",
+            "event",
+            "function",
+            "method",
+            "macro",
+            "keyword",
+            "modifier",
+            "comment",
+            "string",
+            "number",
+            "regexp",
+            "operator",
+            "decorator"
+          ],
+          "tokenModifiers": [
+            "declaration",
+            "definition",
+            "readonly",
+            "static",
+            "deprecated",
+            "abstract",
+            "async",
+            "modification",
+            "documentation",
+            "defaultLibrary"
+          ]
+        },
+        // ...
+        "hover": {
+          // ...
+          "contentFormat": [
+            "markdown",
+            "plaintext"
+          ]
+        },
+        "documentHighlight": {
+            // ...
+        },
+        // ... 
+        "diagnostic": {
+            // ...
+        },
+        // ... 
+      },
+      "window": {
+        // ... 
+      },
+      "general": {
+        // ... 
+      },
+      "workspace": {
+        // ... 
+      }
+    }
+  },
+  "jsonrpc": "2.0",
+  "method": "initialize",
+  "id": 1
+}
+```
