@@ -440,7 +440,25 @@ client sends its capablilities. In particular the `semanticTokens` support,
 `hover` and `diagnostic` capablilities caught my attention. Except for that at
 the very end of the payload there is a method that was sent: `"initialize"`. It
 will be useful to pattern match the client's request with the response that the
-server should send. 
+server should send.
+
+My first thought at this point was "well, crap, now I have to implement JSON
+parser and encoder from scratch". And this is what I am going to do but it won't
+be as difficult as it may look. As per the specification the [Request Message
+follows a very specific
+format](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#requestMessage) which will always be the same.
+
+```txt
+Message {
+  jsonrpc: string
+}
+
+RequestMessage extends Message {
+  id: integer OR string
+  method: string
+  (OPTIONAL) params: array OR object
+}
+```
 
 ```json
 {
