@@ -81,6 +81,8 @@ vim.lsp.enable {
     'luals', -- enable configured servers
     'clangd',
     'solbot-lsp' -- solbot-lsp in particular,
+    -- The name has to match the thing you specified above in
+    -- the `vim.lsp.config['solbot-lsp']` line.
 }
 ```
 
@@ -230,7 +232,7 @@ it when it does not exist) in an append mode. The message is added to the file
 along the newline to make it readable. After that the file is closed.
 
 ```C
-#include <stdio.h> // remember about including 'stdio.h'
+#include <stdio.h> // remember to include 'stdio.h'
 
 void log_message(const char *message) {
   FILE *log_file = fopen("/tmp/solbot-lsp.log", "a"); // 'a' - append mode
@@ -345,6 +347,9 @@ In C the approach might look like the following:
 
 An example implementation might look like this:
 
+TODO: Clarify the ">4 billion bytes" thing; mention that this is due to the
+usage of the uint32 type which enables that amount of storage space.
+
 ```C
 #include <inttypes.h> // Used for printing uint64_t.
 // ...
@@ -406,6 +411,8 @@ int main() {
     }
 
     if (content_length == 0) {
+      // TODO: Exiting Server like this is not nice. Will have to fix it later
+      // with proper message flow.
       return 1;
     }
 
@@ -442,11 +449,7 @@ the very end of the payload there is a method that was sent: `"initialize"`. It
 will be useful to pattern match the client's request with the response that the
 server should send.
 
-My first thought at this point was "well, crap, now I have to implement JSON
-parser and encoder from scratch". And this is what I am going to do but it won't
-be as difficult as it may look. As per the specification the [Request Message
-follows a very specific
-format](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#requestMessage) which will always be the same.
+TODO: Add some json here of how the message looks like, but maybe not full.
 
 ```txt
 Message {
@@ -459,6 +462,34 @@ RequestMessage extends Message {
   (OPTIONAL) params: array OR object
 }
 ```
+
+The next thing to do would be to respond to the client's initialize request.
+This way the handshake will be completed and our server will be registered.
+Before we start parsing the actual JSON and constructing it back as resonses
+properly, the easiest thing would be to simply hardcode a reponse, send it back
+to the client and see what happens. How does the resonse message look like?
+[Let's take a look at the specification again](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#responseMessage).
+The response message must include the ID corresponding to the request message
+AND the result OR error.
+
+```txt
+ResponseMessage extends Message {
+                    id    : integer OR string
+  (ONLY ON SUCCESS) result: this can be anything really e.g. string, int, object
+  (ONLY ON ERROR)   error : response error object with error code and message
+}
+```
+
+What is the simplest valid response message that we could send to the client? We
+can hardcode the message as a C string with the `id` of `1` to match the
+`initialize` request `id` and `result` hardcoded as an arbitrary integer e.g.
+`0`.
+
+My first thought at this point was "well, crap, now I have to implement JSON
+parser and encoder from scratch". And this is what I am going to do but it won't
+be as difficult as it may look. As per the specification the [Request Message
+follows a very specific
+format](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#requestMessage) which will always be the same.
 
 ```json
 {
