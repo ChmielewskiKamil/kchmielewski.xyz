@@ -13,6 +13,7 @@ html {
     font-size: 1em;
     font-family: var(--fonts);
     -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
 }
 
 body {
@@ -115,10 +116,10 @@ code {
 
     table {
         border-collapse: collapse;
-        min-width: 95%;
-        max-width: 95%;
-        display: table;
+        display: block;
+        overflow-x: auto;
         margin: 0 auto 1em auto;
+        max-width: 100%;
     }
 
     td {
