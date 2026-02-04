@@ -55,6 +55,7 @@ code {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    overflow-wrap: break-word;
 
     font-size: 17px;
     line-height: 1.7em;
@@ -116,8 +117,8 @@ code {
     table {
         border-collapse: collapse;
         min-width: 95%;
-        max-width: 95%;
-        display: table;
+        display: block;
+        overflow-x: auto;
         margin: 0 auto 1em auto;
     }
 
