@@ -116,12 +116,10 @@ code {
 
     table {
         border-collapse: collapse;
-        width: 100%;
-        max-width: 100%;
-        display: block;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        margin: 0 0 1em 0;
+        min-width: 95%;
+        max-width: 95%;
+        display: table;
+        margin: 0 auto 1em auto;
     }
 
     td {
@@ -340,6 +338,15 @@ h5 {
 }
 
 @media only screen and (max-width: 540px) {
+    .container table {
+        width: 100%;
+        max-width: 100%;
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        margin: 0 0 1em 0;
+    }
+
     .footer {
         margin-top: 20px;
         flex-direction: column;
