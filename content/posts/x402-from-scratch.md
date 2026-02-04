@@ -1,7 +1,7 @@
 +++
 title = 'x402 for AI Agents: The No-SDK Guide'
 date = 2026-02-03
-draft = true
+draft = false
 tags = ["x402", "crypto", "payments", "foundry"]
 author = "Kamil Chmielewski"
 description = "How to understand and test x402 payments using just curl and Foundry's cast. No SDK, no npm install, no dependencies."
