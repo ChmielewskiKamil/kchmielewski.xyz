@@ -1,7 +1,7 @@
 +++
 title = 'I type at 100 WPM and I switched to voice for coding agents'
 date = 2026-03-26
-draft = true
+draft = false
 tags = ["linux", "agents", "local-llm"]
 author = "Kamil Chmielewski"
 description = "I type at 100 WPM on a hand-soldered Corne keyboard, but speaking to coding agents turned out to be a different game entirely. Here's how I built system-wide voice-to-text with whisper.cpp and a shell script."
